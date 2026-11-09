@@ -1,0 +1,60 @@
+{
+  "name": "Smart Fish Feeder - MQTT Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "topics": "smartfish/telemetry/+,smartfish/status/+",
+        "options": {
+          "jsonParseBody": false,
+          "onlyMessage": false,
+          "parallelProcessing": false
+        }
+      },
+      "id": "6f768e2c-4d72-4b22-9f2d-a497075d53f1",
+      "name": "MQTT Trigger",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const topic = String($json.topic ?? '');\nconst payload = String($json.message ?? '');\nconst receivedAt = new Date().toISOString();\n\nconst topicMap = {\n  'smartfish/telemetry/suhu_air': { group: 'telemetry', key: 'suhu_air_c', unit: 'degC' },\n  'smartfish/telemetry/suhu_wadah': { group: 'telemetry', key: 'suhu_wadah_c', unit: 'degC' },\n  'smartfish/telemetry/kelembapan': { group: 'telemetry', key: 'kelembapan_percent', unit: 'percent' },\n  'smartfish/telemetry/jarak_pakan': { group: 'telemetry', key: 'jarak_pakan_cm', unit: 'cm' },\n  'smartfish/telemetry/jarak_air': { group: 'telemetry', key: 'jarak_air_cm', unit: 'cm' },\n  'smartfish/status/servo': { group: 'status', key: 'servo' },\n  'smartfish/status/device': { group: 'status', key: 'device' },\n};\n\nconst spec = topicMap[topic];\nif (!spec) {\n  throw new Error(`Unexpected Smart Fish topic: ${topic}`);\n}\n\nconst state = $getWorkflowStaticData('global');\nif (!state.smartFishFeeder) {\n  state.smartFishFeeder = { telemetry: {}, status: {} };\n}\nconst deviceState = state.smartFishFeeder;\n\nif (spec.group === 'telemetry') {\n  const numericValue = Number(payload.trim());\n  const validNumber = payload.trim() !== '' && Number.isFinite(numericValue);\n  deviceState.telemetry[spec.key] = validNumber\n    ? { value: numericValue, unit: spec.unit, updated_at: receivedAt }\n    : { value: null, unit: spec.unit, updated_at: receivedAt, raw_value: payload, parse_error: true };\n} else {\n  deviceState.status[spec.key] = { value: payload.trim(), updated_at: receivedAt };\n}\ndeviceState.updated_at = receivedAt;\n\nreturn {\n  json: {\n    device_id: 'smartfish',\n    timestamp: receivedAt,\n    source: { topic, payload },\n    telemetry: deviceState.telemetry,\n    status: deviceState.status,\n    updated_at: deviceState.updated_at,\n  },\n};"
+      },
+      "id": "23d5bc54-1ba3-48fc-8a88-97322d1f1d5f",
+      "name": "Build Current Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "MQTT Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Current Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8c0a040d-6ff4-4d30-acb8-250ef31601ed",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

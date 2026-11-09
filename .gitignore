@@ -1,0 +1,8 @@
+# Credentials lokal untuk firmware; hanya secrets.example.h yang dibagikan.
+firmware/SmartFishFeeder/secrets.h
+
+# Frontend local build and environment files
+web/node_modules/
+web/dist/
+web/.env.local
+web/.env.*.local
